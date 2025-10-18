@@ -18,7 +18,7 @@ Distributed-Hash-Table/
 ```
 
 1. Protocol Buffer Definition (proto/chord.proto)
-```
+```proto
 syntax = "proto3";
 
 package chord;
@@ -148,7 +148,7 @@ protobuf==4.25.1
 ```
 
 3. Utilities (src/utils.py)
-```
+```python
 import hashlib
 
 # Chord ring size (m-bit identifier space)
@@ -200,7 +200,7 @@ def distance(start: int, end: int) -> int:
 ```
 
 4. Storage (src/storage.py)
-```
+```python
 from typing import Dict, List, Tuple
 import threading
 
@@ -270,7 +270,7 @@ class Storage:
 ```
 
 5. Finger Table (src/finger_table.py)
-```
+```python
 from typing import Optional, List
 from dataclasses import dataclass
 import threading
@@ -338,7 +338,7 @@ class FingerTable:
 ```
 
 6. gRPC Client (src/chord_client.py)
-```
+```python
 import grpc
 from typing import Optional, List, Tuple
 import sys

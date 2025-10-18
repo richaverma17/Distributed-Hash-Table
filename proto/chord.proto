@@ -1,10 +1,20 @@
-syntax = "proto3"
+syntax = "proto3";
 
 package chord;
 
 // Chord DHT Service
 service ChordService {
+    // Find successor of a given ID
+    rpc FindSuccessor(FindSuccessorRequest) returns (NodeInfo);
 
+    //Get the predecessor of this node
+    rpc GetPredecessor(Empty) returns (NodeInfo);
+
+    // Notify this node that there will another node might be its predecessor
+    rpc Notify(NodeInfo) returns (Empty);
+
+    // Check if the node is alive
+    rpc Ping(Empty) returns (Empty);
 }
 
 
@@ -12,3 +22,9 @@ message NodeInfo {
     string id = 1;      // Hash ID as string
     string address = 2; // IP:Port
 }
+
+message FindSuccessorRequest {
+    string id = 1;
+}
+
+message Empty {}
