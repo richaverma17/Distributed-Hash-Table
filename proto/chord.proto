@@ -1,0 +1,14 @@
+syntax = "proto3"
+
+package chord;
+
+// Chord DHT Service
+service ChordService {
+
+}
+
+
+message NodeInfo {
+    string id = 1;      // Hash ID as string
+    string address = 2; // IP:Port
+}
