@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11proto/chord.proto\x12\x05\x63hord\"\'\n\x08NodeInfo\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\t\"\"\n\x14\x46indSuccessorRequest\x12\n\n\x02id\x18\x01 \x01(\t\"\x07\n\x05\x45mpty2\xcb\x01\n\x0c\x43hordService\x12=\n\rFindSuccessor\x12\x1b.chord.FindSuccessorRequest\x1a\x0f.chord.NodeInfo\x12/\n\x0eGetPredecessor\x12\x0c.chord.Empty\x1a\x0f.chord.NodeInfo\x12\'\n\x06Notify\x12\x0f.chord.NodeInfo\x1a\x0c.chord.Empty\x12\"\n\x04Ping\x12\x0c.chord.Empty\x1a\x0c.chord.Emptyb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x11proto/chord.proto\x12\x05\x63hord\"\'\n\x08NodeInfo\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\t\"\"\n\x14\x46indSuccessorRequest\x12\n\n\x02id\x18\x01 \x01(\t\"\x19\n\nGetRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\"+\n\x0bGetResponse\x12\r\n\x05\x66ound\x18\x01 \x01(\x08\x12\r\n\x05value\x18\x02 \x01(\t\"(\n\nPutRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"\x1e\n\x0bPutResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\"\x1c\n\rDeleteRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\"\x1f\n\x0e\x44\x65leteResponse\x12\r\n\x05\x66ound\x18\x01 \x01(\x08\"\x07\n\x05\x45mpty2\xde\x02\n\x0c\x43hordService\x12=\n\rFindSuccessor\x12\x1b.chord.FindSuccessorRequest\x1a\x0f.chord.NodeInfo\x12/\n\x0eGetPredecessor\x12\x0c.chord.Empty\x1a\x0f.chord.NodeInfo\x12\'\n\x06Notify\x12\x0f.chord.NodeInfo\x1a\x0c.chord.Empty\x12\"\n\x04Ping\x12\x0c.chord.Empty\x1a\x0c.chord.Empty\x12,\n\x03Get\x12\x11.chord.GetRequest\x1a\x12.chord.GetResponse\x12,\n\x03Put\x12\x11.chord.PutRequest\x1a\x12.chord.PutResponse\x12\x35\n\x06\x44\x65lete\x12\x14.chord.DeleteRequest\x1a\x15.chord.DeleteResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -25,8 +25,20 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_NODEINFO']._serialized_end=67
   _globals['_FINDSUCCESSORREQUEST']._serialized_start=69
   _globals['_FINDSUCCESSORREQUEST']._serialized_end=103
-  _globals['_EMPTY']._serialized_start=105
-  _globals['_EMPTY']._serialized_end=112
-  _globals['_CHORDSERVICE']._serialized_start=115
-  _globals['_CHORDSERVICE']._serialized_end=318
+  _globals['_GETREQUEST']._serialized_start=105
+  _globals['_GETREQUEST']._serialized_end=130
+  _globals['_GETRESPONSE']._serialized_start=132
+  _globals['_GETRESPONSE']._serialized_end=175
+  _globals['_PUTREQUEST']._serialized_start=177
+  _globals['_PUTREQUEST']._serialized_end=217
+  _globals['_PUTRESPONSE']._serialized_start=219
+  _globals['_PUTRESPONSE']._serialized_end=249
+  _globals['_DELETEREQUEST']._serialized_start=251
+  _globals['_DELETEREQUEST']._serialized_end=279
+  _globals['_DELETERESPONSE']._serialized_start=281
+  _globals['_DELETERESPONSE']._serialized_end=312
+  _globals['_EMPTY']._serialized_start=314
+  _globals['_EMPTY']._serialized_end=321
+  _globals['_CHORDSERVICE']._serialized_start=324
+  _globals['_CHORDSERVICE']._serialized_end=674
 # @@protoc_insertion_point(module_scope)

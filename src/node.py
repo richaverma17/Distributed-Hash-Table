@@ -7,6 +7,7 @@ from typing import Optional
 from proto import chord_pb2, chord_pb2_grpc
 from .utils import hash_key, NodeInfo
 from .finger_table import FingerTable, FingerEntry
+from .storage import Storage
 
 
 class Node(chord_pb2_grpc.ChordServiceServicer):
@@ -29,7 +30,8 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         # successor and predecessor of the node
         self.successor = NodeInfo(id=self.id, address=self.address)
         self.predecessor = None
-
+        # Initialize storage
+        self.storage = Storage(self.id)
         # Stabilization state
         self.next_finger = 0 # for fix_fingers
         self._stabilization_thread = None
@@ -295,6 +297,99 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                 self.logger.warning(f"Predecessor {self.predecessor.id % 10000} failed: {e}")
                 self.predecessor = None
 
+    # ======================== Key-Value Operations ==========================
+    
+    def put(self, key: str, value: str) -> bool:
+        """
+        Store a key-value pair in the DHT.
+        The key is hashed and stored at the appropriate node (successor of hash).
+        
+        Args:
+            key: The key to store
+            value: The value to store
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        key_hash = hash_key(key)
+        self.logger.info(f"PUT request for key '{key}' (hash: {key_hash % 10000})")
+        
+        # Find the node responsible for this key
+        responsible_node = self.find_successor(key_hash)
+        
+        if responsible_node.id == self.id:
+            # We are responsible for this key
+            return self.storage.put(key, value)
+        else:
+            # Forward to the responsible node
+            try:
+                stub = self._create_stub(responsible_node.address)
+                response = stub.Put(chord_pb2.PutRequest(key=key, value=value))
+                return response.success
+            except Exception as e:
+                self.logger.error(f"Error forwarding PUT to {responsible_node.address}: {e}")
+                return False
+    
+    def get(self, key: str) -> Optional[str]:
+        """
+        Retrieve a value from the DHT.
+        
+        Args:
+            key: The key to retrieve
+            
+        Returns:
+            The value if found, None otherwise
+        """
+        key_hash = hash_key(key)
+        self.logger.info(f"GET request for key '{key}' (hash: {key_hash % 10000})")
+        
+        # Find the node responsible for this key
+        responsible_node = self.find_successor(key_hash)
+        
+        if responsible_node.id == self.id:
+            # We are responsible for this key
+            return self.storage.get(key)
+        else:
+            # Forward to the responsible node
+            try:
+                stub = self._create_stub(responsible_node.address)
+                response = stub.Get(chord_pb2.GetRequest(key=key))
+                return response.value if response.found else None
+            except Exception as e:
+                self.logger.error(f"Error forwarding GET to {responsible_node.address}: {e}")
+                return None
+    
+    def delete(self, key: str) -> bool:
+        """
+        Delete a key-value pair from the DHT.
+        
+        Args:
+            key: The key to delete
+            
+        Returns:
+            True if key was found and deleted, False otherwise
+        """
+        key_hash = hash_key(key)
+        self.logger.info(f"DELETE request for key '{key}' (hash: {key_hash % 10000})")
+        
+        # Find the node responsible for this key
+        responsible_node = self.find_successor(key_hash)
+        
+        if responsible_node.id == self.id:
+            # We are responsible for this key
+            return self.storage.delete(key)
+        else:
+            # Forward to the responsible node
+            try:
+                stub = self._create_stub(responsible_node.address)
+                response = stub.Delete(chord_pb2.DeleteRequest(key=key))
+                return response.found
+            except Exception as e:
+                self.logger.error(f"Error forwarding DELETE to {responsible_node.address}: {e}")
+                return False
+
+
+
     def start_stabilization(self, interval: float = 1.0):
         """
         Start periodic stabilization in a background thread.
@@ -365,3 +460,32 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         Check if the node is alive
         """
         return chord_pb2.Empty()
+
+    def Get(self, request, context):
+        """
+        RPC handler for Get operation.
+        """
+        key = request.key
+        value = self.storage.get(key)
+        
+        if value is not None:
+            return chord_pb2.GetResponse(found=True, value=value)
+        else:
+            return chord_pb2.GetResponse(found=False, value="")
+    
+    def Put(self, request, context):
+        """
+        RPC handler for Put operation.
+        """
+        key = request.key
+        value = request.value
+        success = self.storage.put(key, value)
+        return chord_pb2.PutResponse(success=success)
+    
+    def Delete(self, request, context):
+        """
+        RPC handler for Delete operation.
+        """
+        key = request.key
+        found = self.storage.delete(key)
+        return chord_pb2.DeleteResponse(found=found)

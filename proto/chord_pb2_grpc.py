@@ -35,6 +35,21 @@ class ChordServiceStub(object):
                 request_serializer=proto_dot_chord__pb2.Empty.SerializeToString,
                 response_deserializer=proto_dot_chord__pb2.Empty.FromString,
                 )
+        self.Get = channel.unary_unary(
+                '/chord.ChordService/Get',
+                request_serializer=proto_dot_chord__pb2.GetRequest.SerializeToString,
+                response_deserializer=proto_dot_chord__pb2.GetResponse.FromString,
+                )
+        self.Put = channel.unary_unary(
+                '/chord.ChordService/Put',
+                request_serializer=proto_dot_chord__pb2.PutRequest.SerializeToString,
+                response_deserializer=proto_dot_chord__pb2.PutResponse.FromString,
+                )
+        self.Delete = channel.unary_unary(
+                '/chord.ChordService/Delete',
+                request_serializer=proto_dot_chord__pb2.DeleteRequest.SerializeToString,
+                response_deserializer=proto_dot_chord__pb2.DeleteResponse.FromString,
+                )
 
 
 class ChordServiceServicer(object):
@@ -69,6 +84,25 @@ class ChordServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Get(self, request, context):
+        """Key-Value operations
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Put(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Delete(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ChordServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -91,6 +125,21 @@ def add_ChordServiceServicer_to_server(servicer, server):
                     servicer.Ping,
                     request_deserializer=proto_dot_chord__pb2.Empty.FromString,
                     response_serializer=proto_dot_chord__pb2.Empty.SerializeToString,
+            ),
+            'Get': grpc.unary_unary_rpc_method_handler(
+                    servicer.Get,
+                    request_deserializer=proto_dot_chord__pb2.GetRequest.FromString,
+                    response_serializer=proto_dot_chord__pb2.GetResponse.SerializeToString,
+            ),
+            'Put': grpc.unary_unary_rpc_method_handler(
+                    servicer.Put,
+                    request_deserializer=proto_dot_chord__pb2.PutRequest.FromString,
+                    response_serializer=proto_dot_chord__pb2.PutResponse.SerializeToString,
+            ),
+            'Delete': grpc.unary_unary_rpc_method_handler(
+                    servicer.Delete,
+                    request_deserializer=proto_dot_chord__pb2.DeleteRequest.FromString,
+                    response_serializer=proto_dot_chord__pb2.DeleteResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -168,5 +217,56 @@ class ChordService(object):
         return grpc.experimental.unary_unary(request, target, '/chord.ChordService/Ping',
             proto_dot_chord__pb2.Empty.SerializeToString,
             proto_dot_chord__pb2.Empty.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Get(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/chord.ChordService/Get',
+            proto_dot_chord__pb2.GetRequest.SerializeToString,
+            proto_dot_chord__pb2.GetResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Put(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/chord.ChordService/Put',
+            proto_dot_chord__pb2.PutRequest.SerializeToString,
+            proto_dot_chord__pb2.PutResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Delete(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/chord.ChordService/Delete',
+            proto_dot_chord__pb2.DeleteRequest.SerializeToString,
+            proto_dot_chord__pb2.DeleteResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
