@@ -68,6 +68,7 @@ def main():
             time.sleep(86400)
     except KeyboardInterrupt:
         print("\nShutting down...")
+        node.stop_server()
         server.stop(0)
         sys.exit(0)
 
