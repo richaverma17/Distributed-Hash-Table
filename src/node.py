@@ -466,7 +466,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         RPC handler for Get operation.
         """
         key = request.key
-        value = self.storage.get(key)
+        value = self.get(key)
         
         if value is not None:
             return chord_pb2.GetResponse(found=True, value=value)
@@ -479,7 +479,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         """
         key = request.key
         value = request.value
-        success = self.storage.put(key, value)
+        success = self.put(key, value)
         return chord_pb2.PutResponse(success=success)
     
     def Delete(self, request, context):
@@ -487,5 +487,5 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         RPC handler for Delete operation.
         """
         key = request.key
-        found = self.storage.delete(key)
+        found = self.delete(key)
         return chord_pb2.DeleteResponse(found=found)
