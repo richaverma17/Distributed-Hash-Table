@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional, Set
+from typing import Dict, Optional
 
 
 class Storage:

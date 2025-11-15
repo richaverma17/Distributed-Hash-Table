@@ -18,7 +18,7 @@ class ChordClient(object):
 
     def put(self, key: str, value: str) -> bool:
         try:
-            request = chord_pb2.PutRequest(key=key, value=value)
+            request = chord_pb2.PutRequest(key=key, value=value, route=True)
             response = self.stub.Put(request)
             return response.success
         except Exception as e:

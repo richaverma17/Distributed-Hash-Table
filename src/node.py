@@ -149,6 +149,14 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                 
                 # Initialize finger table
                 self._init_finger_table()
+
+                # Notify our success that we are the predecessor
+                try:
+                    stub = self._create_stub(self.successor.address)
+                    stub.Notify(self._node_info_to_proto(NodeInfo(self.id, self.address)))
+                    self.logger.info(f"Notified successor: Node {self.successor.id % 10000} at {self.successor.address}")
+                except Exception as e:
+                    self.logger.error(f"Error notifying successor: {e}")
                 
                 self.logger.info("Successfully joined the Chord network")
                 return True
@@ -199,7 +207,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         - Otherwise, forward to closest preceding node
         """
         # If id is in (n, successor], return successor
-        if self._in_range(id, self.id, self.successor.id, inclusive_start=True, inclusive_end=True):
+        if self._in_range(id, self.id, self.successor.id, inclusive_start=False, inclusive_end=True):
             return self.successor
         
         # Otherwise, forward to closest preceding node
@@ -230,14 +238,15 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
             x = self._proto_to_node_info(response)
             
             # If x exists and is between us and our successor, it should be our new successor
-            if x and x.id != self.id and self._in_range(x.id, self.id, self.successor.id):
-                self.logger.info(f"Updating successor from {self.successor.id % 10000} to {x.id % 10000}")
-                self.successor = x
-                # Also update first finger
-                self.finger_table[0] = FingerEntry(
-                    start=self.finger_table.start(0),
-                    successor=self.successor
-                )
+            if x and x.id != self.id:
+                if (self.successor.id == self.id or self._in_range(x.id, self.id, self.successor.id)):
+                    self.logger.info(f"Updating successor from {self.successor.id % 10000} to {x.id % 10000}")
+                    self.successor = x
+                    # Also update first finger
+                    self.finger_table[0] = FingerEntry(
+                        start=self.finger_table.start(0),
+                        successor=self.successor
+                    )
             
             # Notify successor that we might be its predecessor
             stub = self._create_stub(self.successor.address)
@@ -254,9 +263,14 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         Args:
             node: The node that might be our predecessor
         """
+        # Don't accept self as predecessor notification from others
+        if node.id == self.id:
+            return
+
         # If we don't have a predecessor, or if node is between our predecessor and us,
         # then node becomes our new predecessor
         if (self.predecessor is None or 
+            self.predecessor.id == self.id or
             self._in_range(node.id, self.predecessor.id, self.id)):
             self.logger.info(f"Updating predecessor to Node {node.id % 10000}")
             self.predecessor = node
@@ -323,6 +337,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         else:
             # Forward to the responsible node
             try:
+                self.logger.info(f"Forwarding PUT to {responsible_node.address}")
                 stub = self._create_stub(responsible_node.address)
                 response = stub.Put(chord_pb2.PutRequest(key=key, value=value))
                 return response.success
@@ -479,7 +494,15 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         """
         key = request.key
         value = request.value
-        success = self.put(key, value)
+
+        if request.route:
+            # Client request - route to the correct node
+            success = self.put(key, value)
+        else:
+            # Node request - store locally
+            success = self.storage.put(key, value)
+        
+        self.logger.info(f"PUT request for key '{key}' (hash: {hash_key(key) % 10000})")
         return chord_pb2.PutResponse(success=success)
     
     def Delete(self, request, context):
