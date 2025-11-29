@@ -50,6 +50,11 @@ class ChordServiceStub(object):
                 request_serializer=proto_dot_chord__pb2.DeleteRequest.SerializeToString,
                 response_deserializer=proto_dot_chord__pb2.DeleteResponse.FromString,
                 )
+        self.GetSuccessor = channel.unary_unary(
+                '/chord.ChordService/GetSuccessor',
+                request_serializer=proto_dot_chord__pb2.Empty.SerializeToString,
+                response_deserializer=proto_dot_chord__pb2.NodeInfo.FromString,
+                )
 
 
 class ChordServiceServicer(object):
@@ -103,6 +108,13 @@ class ChordServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetSuccessor(self, request, context):
+        """Get this node's successor
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ChordServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -140,6 +152,11 @@ def add_ChordServiceServicer_to_server(servicer, server):
                     servicer.Delete,
                     request_deserializer=proto_dot_chord__pb2.DeleteRequest.FromString,
                     response_serializer=proto_dot_chord__pb2.DeleteResponse.SerializeToString,
+            ),
+            'GetSuccessor': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSuccessor,
+                    request_deserializer=proto_dot_chord__pb2.Empty.FromString,
+                    response_serializer=proto_dot_chord__pb2.NodeInfo.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -268,5 +285,22 @@ class ChordService(object):
         return grpc.experimental.unary_unary(request, target, '/chord.ChordService/Delete',
             proto_dot_chord__pb2.DeleteRequest.SerializeToString,
             proto_dot_chord__pb2.DeleteResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetSuccessor(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/chord.ChordService/GetSuccessor',
+            proto_dot_chord__pb2.Empty.SerializeToString,
+            proto_dot_chord__pb2.NodeInfo.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

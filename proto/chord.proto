@@ -20,6 +20,9 @@ service ChordService {
     rpc Get(GetRequest) returns (GetResponse);
     rpc Put(PutRequest) returns (PutResponse);
     rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+    // Get this node's successor
+    rpc GetSuccessor(Empty) returns (NodeInfo);
 }
 
 

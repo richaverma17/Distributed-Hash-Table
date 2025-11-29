@@ -1,7 +1,7 @@
 import grpc
 from concurrent import futures
 import logging
-from typing import Optional
+from typing import Optional, List
 
 # Module imports
 from proto import chord_pb2, chord_pb2_grpc
@@ -15,7 +15,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
     Chord Node
     """
 
-    def __init__(self, address: str):
+    def __init__(self, address: str, replication_factor: int = 3):
         """
         Initialize the Chord node.
         """
@@ -36,6 +36,9 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         self.next_finger = 0 # for fix_fingers
         self._stabilization_thread = None
         self._stabilization_running = False
+
+        # Replication factor
+        self.replication_factor = replication_factor
 
     def _create_stub(self, address: str):
         """
@@ -100,6 +103,37 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
             else:
                 return key > start or key < end
 
+    def _get_replica_nodes(self, key_hash: int) -> List[NodeInfo]:
+        """
+        Get list of nodes that should store replicas for this key.
+        Returns [primary, replica1, replica2, ...]
+        """
+        replicas = []
+        current = self.find_successor(key_hash)
+        replicas.append(current)
+
+        # Get next R-1 successors
+        for i in range(self.replication_factor - 1):
+            try:
+                if current.id == self.id:
+                    # use our successor
+                    current = self.successor
+                else:
+                    # ask the node for its successor
+                    stub = self._create_stub(current.address)
+                    response = stub.FindSuccessor(chord_pb2.FindSuccessorRequest(id=str(key_hash)))
+                    current = self._proto_to_node_info(response)
+
+                # Avoid duplicates (in case ring is smaller than replication factor)
+                if current.id not in [r.id for r in replicas]:
+                    replicas.append(current)
+                else:
+                    break
+            except Exception as e:
+                self.logger.error(f"Error getting successor from {current.address}: {e}")
+                break
+
+        return replicas
 
     def start_server(self):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -328,22 +362,36 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         key_hash = hash_key(key)
         self.logger.info(f"PUT request for key '{key}' (hash: {key_hash % 10000})")
         
-        # Find the node responsible for this key
-        responsible_node = self.find_successor(key_hash)
-        
-        if responsible_node.id == self.id:
-            # We are responsible for this key
-            return self.storage.put(key, value)
-        else:
-            # Forward to the responsible node
+        # Get list of nodes that should store replicas for this key
+        replica_nodes = self._get_replica_nodes(key_hash)
+
+        # Store on all replicas
+        success_count = 0
+        for i, node in enumerate(replica_nodes):
             try:
-                self.logger.info(f"Forwarding PUT to {responsible_node.address}")
-                stub = self._create_stub(responsible_node.address)
-                response = stub.Put(chord_pb2.PutRequest(key=key, value=value))
-                return response.success
+                if node.id == self.id:
+                    # Store locally
+                    if self.storage.put(key, value):
+                        success_count += 1
+                        self.logger.info(f"Stored key '{key}' on local node {self.id % 10000}")
+                else:
+                    # Forward to replica node
+                    stub = self._create_stub(node.address)
+                    response = stub.Put(chord_pb2.PutRequest(key=key, value=value, route=False))
+                    if response.success:
+                        success_count += 1
+                        self.logger.info(f"Stored key '{key}' on replica node {node.id % 10000}")
             except Exception as e:
-                self.logger.error(f"Error forwarding PUT to {responsible_node.address}: {e}")
-                return False
+                self.logger.error(f"Failed to store on replica {i} (Node {node.id % 10000}): {e}")
+                continue
+
+        # Consider successfull if stored on majority of nodes
+        min_required = min(self.replication_factor, max(1, len(replica_nodes)))
+        success = success_count >= min_required
+
+        self.logger.info(f"PUT '{key}': stored on {success_count}/{min_required} replicas")
+        return success
+
     
     def get(self, key: str) -> Optional[str]:
         """
@@ -358,21 +406,33 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         key_hash = hash_key(key)
         self.logger.info(f"GET request for key '{key}' (hash: {key_hash % 10000})")
         
-        # Find the node responsible for this key
-        responsible_node = self.find_successor(key_hash)
-        
-        if responsible_node.id == self.id:
-            # We are responsible for this key
-            return self.storage.get(key)
-        else:
-            # Forward to the responsible node
+
+        # Get list of nodes that should store replicas for this key
+
+        replica_nodes = self._get_replica_nodes(key_hash)
+
+        # Try each replica until we find the value:
+        for i, node in enumerate(replica_nodes):
             try:
-                stub = self._create_stub(responsible_node.address)
-                response = stub.Get(chord_pb2.GetRequest(key=key))
-                return response.value if response.found else None
+                if node.id == self.id:
+                    # Read locally
+                    value = self.storage.get(key)
+                    if value is not None:
+                        self.logger.info(f"Found key '{key}' on local node {self.id % 10000}")
+                        return value
+                else:
+                    # Forward to replica node
+                    stub = self._create_stub(node.address)
+                    response = stub.Get(chord_pb2.GetRequest(key=key))
+                    if response.found:
+                        self.logger.info(f"Found key '{key}' on replica node {node.id % 10000}")
+                        return response.value
             except Exception as e:
-                self.logger.error(f"Error forwarding GET to {responsible_node.address}: {e}")
-                return None
+                self.logger.error(f"Failed to get on replica {i} (Node {node.id % 10000}): {e}")
+                continue
+
+        return None
+
     
     def delete(self, key: str) -> bool:
         """
@@ -387,22 +447,35 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         key_hash = hash_key(key)
         self.logger.info(f"DELETE request for key '{key}' (hash: {key_hash % 10000})")
         
-        # Find the node responsible for this key
-        responsible_node = self.find_successor(key_hash)
-        
-        if responsible_node.id == self.id:
-            # We are responsible for this key
-            return self.storage.delete(key)
-        else:
-            # Forward to the responsible node
-            try:
-                stub = self._create_stub(responsible_node.address)
-                response = stub.Delete(chord_pb2.DeleteRequest(key=key))
-                return response.found
-            except Exception as e:
-                self.logger.error(f"Error forwarding DELETE to {responsible_node.address}: {e}")
-                return False
 
+        # Get list of nodes that should store replicas for this key
+        replica_nodes = self._get_replica_nodes(key_hash)
+
+        # Delete from ALL replicas to maintain consistency
+        found_on_any = False
+        delete_count = 0
+
+        for i, node in enumerate(replica_nodes):
+            try:
+                if node.id == self.id:
+                    # Delete locally
+                    if self.storage.delete(key):
+                        found_on_any = True
+                        delete_count += 1
+                        self.logger.info(f"Deleted key '{key}' on local node {self.id % 10000}")
+                else:
+                    # Forward to replica node
+                    stub = self._create_stub(node.address)
+                    response = stub.Delete(chord_pb2.DeleteRequest(key=key))
+                    if response.found:
+                        found_on_any = True
+                        delete_count += 1
+                        self.logger.info(f"Deleted key '{key}' on replica node {node.id % 10000}")
+            except Exception as e:
+                self.logger.error(f"Failed to delete on replica {i} (Node {node.id % 10000}): {e}")
+
+        self.logger.info(f"Deleted key '{key}' on {delete_count} replicas")
+        return found_on_any
 
 
     def start_stabilization(self, interval: float = 1.0):
@@ -512,3 +585,9 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         key = request.key
         found = self.delete(key)
         return chord_pb2.DeleteResponse(found=found)
+
+    def GetSuccessor(self, request, context):
+        """
+        Return this node's successor.
+        """
+        return self._node_info_to_proto(self.successor)

@@ -1,5 +1,7 @@
 import logging
 from typing import Dict, Optional, List
+import os
+import json
 
 
 class Storage:
@@ -8,7 +10,7 @@ class Storage:
     Each node stores keys that it is responsible for.
     """
     
-    def __init__(self, node_id: int):
+    def __init__(self, node_id: int, persist_path: str = "data"):
         """
         Initialize storage for a node.
         
@@ -18,6 +20,30 @@ class Storage:
         self.node_id = node_id
         self.data: Dict[str, str] = {}
         self.logger = logging.getLogger(f"Storage-{node_id % 10000}")
+        self.persist_path = persist_path
+        # Create directory if it doesn't exist
+        os.makedirs(persist_path, exist_ok=True)
+        # Create file name
+        self.db_file = f"{persist_path}/node_{node_id:05d}.json"
+
+        # Load data from disk
+        self._load_from_disk()
+
+    def _load_from_disk(self):
+        """
+        Load data from disk.
+        """
+        if os.path.exists(self.db_file):
+            with open(self.db_file, "r") as f:
+                self.data = json.load(f)
+                self.logger.info(f"Loaded {len(self.data)} keys from {self.db_file}")
+
+    def _save_to_disk(self):
+        """
+        Save data to disk.
+        """
+        with open(self.db_file, "w") as f:
+            json.dump(self.data, f)
     
     def put(self, key: str, value: str) -> bool:
         """

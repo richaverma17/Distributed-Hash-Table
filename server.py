@@ -276,10 +276,19 @@ async def root():
                 <div class="stat-label">Ring Size</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="key-count">0</div>
-                <div class="stat-label">Total Keys</div>
+                <div class="stat-value" id="unique-key-count">0</div>
+                <div class="stat-label">Unique Keys</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="replica-count">0</div>
+                <div class="stat-label">Total Replicas</div>
+            </div>
+            <div class="stat-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="stat-value" style="color: white;">3</div>
+                <div class="stat-label" style="color: rgba(255,255,255,0.9);">Replication Factor</div>
             </div>
         </div>
+
 
         <div class="controls">
             <h2>Node Management</h2>
@@ -312,6 +321,15 @@ async def root():
             <div class="card">
                 <h2>Chord Ring Visualization</h2>
                 <canvas id="ring-canvas"></canvas>
+
+            <div style="margin-top: 10px; padding: 10px; background: #f7fafc; border-radius: 5px; font-size: 0.9em;">
+                <strong>Legend:</strong>
+                <span style="margin-left: 15px;">🔵 Node</span>
+                <span style="margin-left: 15px;">🟢 Node with keys</span>
+                <span style="margin-left: 15px;"><span style="display: inline-block; width: 30px; height: 2px; background: rgba(72, 187, 120, 0.3); vertical-align: middle;"></span> Replication</span>
+                <span style="margin-left: 15px;">🔑 Primary key</span>
+                <span style="margin-left: 15px;">📋 Replica</span>
+            </div>
             </div>
 
             <div class="card">
@@ -352,16 +370,19 @@ async def root():
                 drawRing();
                 updateSelects();
                 
-                // Update total keys count
-                if (data.total_keys !== undefined) {{
-                    document.getElementById('key-count').textContent = data.total_keys;
+                // Update key counts
+                if (data.unique_keys !== undefined) {{
+                    document.getElementById('unique-key-count').textContent = data.unique_keys;
+                }}
+                if (data.total_replicas !== undefined) {{
+                    document.getElementById('replica-count').textContent = data.total_replicas;
                 }}
             }} else if (data.type === 'log') {{
                 addLog(data.message, data.level);
             }}
         }}
 
-      function updateNodesDisplay() {{
+        function updateNodesDisplay() {{
             const nodesList = document.getElementById('nodes-list');
             const nodeCount = document.getElementById('node-count');
             
@@ -374,7 +395,14 @@ async def root():
 
             nodesList.innerHTML = Object.entries(nodes).map(([addr, node]) => {{
                 const keysList = node.keys && node.keys.length > 0 
-                    ? node.keys.map(k => `<span style="background: #e6fffa; padding: 2px 6px; border-radius: 3px; margin: 2px; display: inline-block; font-size: 0.85em;">${{k}}</span>`).join(' ')
+                    ? node.keys.map(k => {{
+                        // Determine if this is a primary or replica by checking which node should own it
+                        const keyHash = hashString(k);
+                        const isPrimary = findResponsibleNode(keyHash) === node.id;
+                        const bgColor = isPrimary ? '#c6f6d5' : '#e6fffa';  // Green for primary, cyan for replica
+                        const icon = isPrimary ? '🔑' : '📋';
+                        return `<span style="background: ${{bgColor}}; padding: 2px 6px; border-radius: 3px; margin: 2px; display: inline-block; font-size: 0.85em;" title="${{isPrimary ? 'Primary' : 'Replica'}}">${{icon}} ${{k}}</span>`;
+                    }}).join(' ')
                     : '<span style="color: #a0aec0; font-size: 0.85em;">No keys</span>';
                 
                 return `
@@ -388,8 +416,30 @@ async def root():
                         </div>
                     </div>
                 </div>
-            `;
+                `;
             }}).join('');
+        }}
+
+        // Helper function to hash strings (simplified version)
+        function hashString(str) {{
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {{
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }}
+            return Math.abs(hash) % 10000;
+        }}
+
+        // Helper to find which node should own this key
+        function findResponsibleNode(keyHash) {{
+            const nodeIds = Object.values(nodes).map(n => n.id).sort((a, b) => a - b);
+            for (let nodeId of nodeIds) {{
+                if (keyHash <= nodeId) {{
+                    return nodeId;
+                }}
+            }}
+            return nodeIds[0];  // Wraparound to first node
         }}
 
         function updateSelects() {{
@@ -425,9 +475,42 @@ async def root():
             ctx.lineWidth = 3;
             ctx.stroke();
             
-            // Draw nodes
             const ringSize = {RING_SIZE};
-            Object.entries(nodes).forEach(([addr, node], idx) => {{
+            const nodeArray = Object.entries(nodes);
+            
+            // First pass: Draw replication lines (so they appear behind nodes)
+            nodeArray.forEach(([addr, node]) => {{
+                const angle = (node.id / ringSize) * 2 * Math.PI - Math.PI / 2;
+                const x = centerX + radius * Math.cos(angle);
+                const y = centerY + radius * Math.sin(angle);
+                
+                // Draw lines to next 2 nodes (replicas) in lighter color
+                let currentId = node.id;
+                let replicaCount = 0;
+                const maxReplicas = 2;  // Show replication_factor - 1
+                
+                nodeArray.forEach(([_, otherNode]) => {{
+                    if (replicaCount < maxReplicas && otherNode.id > currentId) {{
+                        const otherAngle = (otherNode.id / ringSize) * 2 * Math.PI - Math.PI / 2;
+                        const otherX = centerX + radius * Math.cos(otherAngle);
+                        const otherY = centerY + radius * Math.sin(otherAngle);
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(otherX, otherY);
+                        ctx.strokeStyle = 'rgba(72, 187, 120, 0.2)';  // Green for replication
+                        ctx.lineWidth = 2;
+                        ctx.setLineDash([3, 3]);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        
+                        replicaCount++;
+                    }}
+                }});
+            }});
+            
+            // Second pass: Draw nodes (on top)
+            nodeArray.forEach(([addr, node], idx) => {{
                 const angle = (node.id / ringSize) * 2 * Math.PI - Math.PI / 2;
                 const x = centerX + radius * Math.cos(angle);
                 const y = centerY + radius * Math.sin(angle);
@@ -435,7 +518,7 @@ async def root():
                 // Draw node
                 ctx.beginPath();
                 ctx.arc(x, y, 15, 0, 2 * Math.PI);
-                ctx.fillStyle = node.key_count > 0 ? '#48bb78' : '#667eea';  // Green if has keys
+                ctx.fillStyle = node.key_count > 0 ? '#48bb78' : '#667eea';
                 ctx.fill();
                 ctx.strokeStyle = 'white';
                 ctx.lineWidth = 3;
@@ -447,7 +530,7 @@ async def root():
                 ctx.textAlign = 'center';
                 ctx.fillText(`N${{node.id}}`, x, y - 25);
                 
-                // Draw key count badge if node has keys
+                // Draw key count badge
                 if (node.key_count > 0) {{
                     ctx.fillStyle = '#f56565';
                     ctx.beginPath();
@@ -456,25 +539,6 @@ async def root():
                     ctx.fillStyle = 'white';
                     ctx.font = 'bold 10px Arial';
                     ctx.fillText(node.key_count, x + 10, y - 7);
-                }}
-                
-                // Draw successor line
-                if (node.successor_id !== node.id) {{
-                    const succNode = Object.values(nodes).find(n => n.id === node.successor_id);
-                    if (succNode) {{
-                        const succAngle = (succNode.id / ringSize) * 2 * Math.PI - Math.PI / 2;
-                        const succX = centerX + radius * Math.cos(succAngle);
-                        const succY = centerY + radius * Math.sin(succAngle);
-                        
-                        ctx.beginPath();
-                        ctx.moveTo(x, y);
-                        ctx.lineTo(succX, succY);
-                        ctx.strokeStyle = 'rgba(102, 126, 234, 0.3)';
-                        ctx.lineWidth = 2;
-                        ctx.setLineDash([5, 5]);
-                        ctx.stroke();
-                        ctx.setLineDash([]);
-                    }}
                 }}
             }});
         }}
@@ -667,6 +731,7 @@ async def broadcast_nodes_update():
     """Broadcast current nodes state to all connected clients"""
     nodes_data = {}
     total_keys = 0
+    total_unique_keys = set()  # Track unique keys across all nodes
     
     for address, node_data in active_nodes.items():
         node = node_data["node"]
@@ -674,20 +739,27 @@ async def broadcast_nodes_update():
         key_count = len(keys)
         total_keys += key_count
         
+        # Track unique keys
+        total_unique_keys.update(keys.keys())
+        
         nodes_data[address] = {
             "id": node.id % 10000,
             "address": address,
             "successor_id": node.successor.id % 10000 if node.successor else None,
             "predecessor_id": node.predecessor.id % 10000 if node.predecessor else None,
             "key_count": key_count,
-            "keys": list(keys.keys())  # Send list of key names
+            "keys": list(keys.keys()),  # Send list of key names
+            "replication_factor": getattr(node, 'replication_factor', 1)  # Add replication factor
         }
     
     await manager.broadcast({
         "type": "nodes_update",
         "nodes": nodes_data,
-        "total_keys": total_keys
+        "total_keys": total_keys,
+        "unique_keys": len(total_unique_keys),  # Unique keys count
+        "total_replicas": total_keys  # Total including replicas
     })
+
 
 async def broadcast_log(message: str, level: str = "info"):
     """Broadcast a log message to all connected clients"""
@@ -716,7 +788,8 @@ async def get_nodes():
             "successor_id": node.successor.id % 10000 if node.successor else None,
             "predecessor_id": node.predecessor.id % 10000 if node.predecessor else None,
             "key_count": key_count,
-            "keys": list(keys.keys())
+            "keys": list(keys.keys()),
+            "replication_factor": getattr(node, 'replication_factor', 1)
         }
     
     return {"nodes": nodes_data, "total_keys": total_keys}
@@ -829,49 +902,38 @@ async def put_key(request: KeyValueRequest):
         if not node.running:
             raise Exception(f"Node {request.node_address} is not running")
         
-        # Calculate which node should store this key
         from src.utils import hash_key
         key_hash = hash_key(request.key)
         
-        # Find the responsible node
         loop = asyncio.get_event_loop()
         responsible_node_info = await loop.run_in_executor(None, node.find_successor, key_hash)
         
-        # Perform the PUT operation
         success = await loop.run_in_executor(None, node.put, request.key, request.value)
         
         if success:
-            # Find which node actually stored it
-            responsible_address = responsible_node_info.address if responsible_node_info else "Unknown"
             responsible_id = responsible_node_info.id % 10000 if responsible_node_info else "?"
+            replication_factor = getattr(node, 'replication_factor', 1)
             
             await broadcast_log(
-                f"PUT '{request.key}' = '{request.value}' → Stored on Node {responsible_id} ({responsible_address})", 
+                f"PUT '{request.key}' = '{request.value}' → Primary: Node {responsible_id} (+ {replication_factor-1} replicas)", 
                 "success"
             )
             
-            # Trigger nodes update to refresh key counts
             await broadcast_nodes_update()
             
             return {
                 "status": "success", 
-                "message": f"Key '{request.key}' stored on Node {responsible_id}",
-                "stored_on": responsible_address,
-                "stored_node_id": responsible_id
+                "message": f"Key '{request.key}' stored with {replication_factor}x replication",
+                "stored_on": responsible_node_info.address if responsible_node_info else "Unknown",
+                "replication_factor": replication_factor
             }
         else:
             await broadcast_log(f"Failed to PUT '{request.key}'", "error")
             return {"status": "error", "message": "Failed to store key"}
-    except grpc.RpcError as e:
-        error_msg = f"gRPC error: {e.details()}"
-        logger.error(f"Error in PUT operation: {error_msg}")
-        await broadcast_log("Connection error: Node might be down", "error")
-        return {"status": "error", "message": f"Connection error: {error_msg}"}
     except Exception as e:
         logger.error(f"Error in PUT operation: {e}")
         await broadcast_log(f"Error: {str(e)}", "error")
         return {"status": "error", "message": str(e)}
-
 
 @app.get("/api/get")
 async def get_key(key: str, node_address: str):
