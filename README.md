@@ -1,489 +1,424 @@
-Chord - DHT
+# Chord Distributed Hash Table (DHT) with Replication
+
+A Python implementation of the Chord distributed hash table protocol with built-in replication for fault tolerance and a real-time web visualization interface.
+
+## 🎯 What is Chord DHT?
+
+Chord is a distributed hash table protocol that provides efficient key lookup in a peer-to-peer network. It uses consistent hashing to distribute keys across nodes in a circular identifier space (ring). Each node is responsible for a portion of the key space and maintains routing information (finger table) to efficiently locate keys in O(log N) hops.
+
+## ✨ Features
+
+- **Chord Protocol Implementation**: Full implementation of the Chord DHT protocol
+  - Efficient key lookup using finger tables (O(log N) complexity)
+  - Automatic node joining and stabilization
+  - Consistent hashing for key distribution
+  
+- **Fault Tolerance with Replication**:
+  - Configurable replication factor (default: 3x replication)
+  - Keys are replicated across multiple successor nodes
+  - Automatic replica synchronization during PUT/DELETE operations
+  - Quorum-based writes for consistency
+  
+- **Real-time Web Visualization**:
+  - Interactive web UI showing the Chord ring
+  - Live node status and key distribution
+  - Visual distinction between primary keys and replicas
+  - Real-time activity logs
+  - WebSocket-based updates
+  
+- **Key-Value Operations**:
+  - PUT: Store key-value pairs with replication
+  - GET: Retrieve values with replica fallback
+  - DELETE: Consistent deletion across all replicas
+  
+- **Persistent Storage**:
+  - JSON-based persistence for each node
+  - Automatic recovery on node restart
+
+## 🏗️ Architecture
+
+### Project Structure
 
 ```
 Distributed-Hash-Table/
 ├── proto/
-│   └── chord.proto
+│   ├── chord.proto          # gRPC service definitions
+│   ├── chord_pb2.py         # Generated protocol buffers
+│   └── chord_pb2_grpc.py    # Generated gRPC stubs
 ├── src/
 │   ├── __init__.py
-│   ├── chord_node.py        # Main Node class
-│   ├── chord_server.py      # gRPC server implementation
-│   ├── chord_client.py      # gRPC client wrapper
-│   ├── storage.py           # Key-value storage
+│   ├── node.py              # Core Chord node implementation
+│   ├── storage.py           # Persistent key-value storage
 │   ├── finger_table.py      # Chord finger table
-│   └── utils.py             # Hashing utilities
-├── node.py                  # Entry point for running a node
+│   └── utils.py             # Hashing and utility functions
+├── data/                    # Storage directory (created automatically)
+├── server.py                # FastAPI web server & visualizer
+├── client.py                # CLI client for testing
+├── run.py                   # Node runner script
 ├── requirements.txt
 └── README.md
 ```
 
-1. Protocol Buffer Definition (proto/chord.proto)
-```proto
-syntax = "proto3";
+### Key Components
 
-package chord;
+1. **Node (`src/node.py`)**: 
+   - Implements Chord protocol operations (find_successor, stabilize, fix_fingers, etc.)
+   - Handles replication across successor nodes
+   - Manages finger table for efficient routing
+   - Performs periodic stabilization and failure detection
 
-// Chord DHT Service
-service ChordService {
-    // Key-value operations
-    rpc Put(PutRequest) returns (PutResponse);
-    rpc Get(GetRequest) returns (GetResponse);
-    rpc Delete(DeleteRequest) returns (DeleteResponse);
-    
-    // Chord protocol operations
-    rpc FindSuccessor(FindSuccessorRequest) returns (FindSuccessorResponse);
-    rpc FindPredecessor(FindPredecessorRequest) returns (FindPredecessorResponse);
-    rpc GetSuccessor(GetSuccessorRequest) returns (GetSuccessorResponse);
-    rpc GetPredecessor(GetPredecessorRequest) returns (GetPredecessorResponse);
-    rpc Notify(NotifyRequest) returns (NotifyResponse);
-    rpc ClosestPrecedingFinger(ClosestPrecedingFingerRequest) returns (ClosestPrecedingFingerResponse);
-    
-    // Node management
-    rpc Ping(PingRequest) returns (PingResponse);
-    rpc TransferKeys(TransferKeysRequest) returns (TransferKeysResponse);
-}
+2. **Storage (`src/storage.py`)**: 
+   - Persistent JSON-based storage per node
+   - Thread-safe operations
+   - Automatic disk persistence
 
-message NodeInfo {
-    string id = 1;       // Hash ID as string
-    string address = 2;  // IP:Port
-}
+3. **Finger Table (`src/finger_table.py`)**: 
+   - Maintains routing information for O(log N) lookups
+   - Periodically refreshed during stabilization
 
-message PutRequest {
-    string key = 1;
-    string value = 2;
-}
+4. **Web Server (`server.py`)**: 
+   - FastAPI-based visualization interface
+   - Manages multiple nodes in a single process
+   - Real-time updates via WebSocket
+   - Provides REST API for node/key operations
 
-message PutResponse {
-    bool success = 1;
-    string message = 2;
-}
+## 📋 Prerequisites
 
-message GetRequest {
-    string key = 1;
-}
+- Python 3.8 or higher
+- pip (Python package manager)
 
-message GetResponse {
-    bool found = 1;
-    string value = 2;
-}
+## 🚀 Setup Instructions
 
-message DeleteRequest {
-    string key = 1;
-}
+### 1. Clone the Repository
 
-message DeleteResponse {
-    bool success = 1;
-}
-
-message FindSuccessorRequest {
-    string id = 1;
-}
-
-message FindSuccessorResponse {
-    NodeInfo node = 1;
-}
-
-message FindPredecessorRequest {
-    string id = 1;
-}
-
-message FindPredecessorResponse {
-    NodeInfo node = 1;
-}
-
-message GetSuccessorRequest {}
-
-message GetSuccessorResponse {
-    NodeInfo node = 1;
-}
-
-message GetPredecessorRequest {}
-
-message GetPredecessorResponse {
-    NodeInfo node = 1;
-    bool has_predecessor = 2;
-}
-
-message NotifyRequest {
-    NodeInfo node = 1;
-}
-
-message NotifyResponse {
-    bool success = 1;
-}
-
-message ClosestPrecedingFingerRequest {
-    string id = 1;
-}
-
-message ClosestPrecedingFingerResponse {
-    NodeInfo node = 1;
-}
-
-message PingRequest {}
-
-message PingResponse {
-    bool alive = 1;
-}
-
-message KeyValue {
-    string key = 1;
-    string value = 2;
-}
-
-message TransferKeysRequest {
-    repeated KeyValue keys = 1;
-}
-
-message TransferKeysResponse {
-    bool success = 1;
-}
+```bash
+git clone <your-repo-url>
+cd Distributed-Hash-Table
 ```
 
-2. Requirements (requirements.txt)
-```
-grpcio==1.60.0
-grpcio-tools==1.60.0
-protobuf==4.25.1
+### 2. Create Virtual Environment (Recommended)
+
+```bash
+# Create virtual environment
+python3 -m venv venv
+
+# Activate virtual environment
+# On macOS/Linux:
+source venv/bin/activate
+
+# On Windows:
+venv\Scripts\activate
 ```
 
-3. Utilities (src/utils.py)
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+The project requires:
+- `grpcio` and `grpcio-tools` - For gRPC communication between nodes
+- `protobuf` - Protocol buffer support
+- `fastapi` and `uvicorn` - Web server and API framework
+- `websockets` - Real-time updates
+- `pyyaml` and `python-dotenv` - Configuration management
+
+### 4. Generate Protocol Buffers (If Modified)
+
+If you modify `proto/chord.proto`, regenerate the Python files:
+
+```bash
+python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/chord.proto
+```
+
+### 5. Create Data Directory
+
+The data directory is created automatically, but you can create it manually if needed:
+
+```bash
+mkdir -p data
+```
+
+## 🎮 Usage
+
+### Option 1: Web Visualizer (Recommended)
+
+Start the web server with visualization interface:
+
+```bash
+python server.py
+```
+
+Then open your browser to: **http://localhost:8000**
+
+#### Using the Web Interface:
+
+1. **Add Nodes**: 
+   - Click **"➕ Add Node"** to create the first node (forms a new ring)
+   - Click **"➕ Add & Join"** to add more nodes to the existing ring
+   - Recommended: Start with 4-5 nodes to see replication in action
+
+2. **Store Data**:
+   - Enter a key (e.g., "user123") and value (e.g., "John Doe")
+   - Select any node to contact
+   - Click **"PUT"** to store (will be replicated 3x automatically)
+   - Watch the activity log to see which nodes store the replicas
+
+3. **Retrieve Data**:
+   - Enter a key
+   - Select any node (doesn't have to be the one you used for PUT)
+   - Click **"GET"** (will find the key even if a node fails)
+
+4. **Delete Data**:
+   - Enter a key
+   - Click **"DELETE"** (removes from all replicas to maintain consistency)
+
+5. **Visualize**:
+   - See the Chord ring with all nodes positioned by their hash IDs
+   - Green dashed lines show replication relationships
+   - Keys shown with 🔑 (primary) or 📋 (replica) icons
+   - Green badge shows number of keys per node
+
+#### Understanding the UI:
+
+- **Stats Cards**: Show active nodes, ring size, unique keys, total replicas, and replication factor
+- **Chord Ring**: Visual representation of nodes on the identifier space
+- **Active Nodes Panel**: Lists all nodes with their keys, successors, and predecessors
+- **Activity Log**: Real-time log of all operations
+
+### Option 2: Command Line (Advanced)
+
+Run individual nodes in separate terminals:
+
+```bash
+# Terminal 1: Start first node
+python run.py --port 50051
+
+# Terminal 2: Join second node
+python run.py --port 50052 --join localhost:50051
+
+# Terminal 3: Join third node
+python run.py --port 50053 --join localhost:50051
+```
+
+Use the CLI client:
+
+```bash
+# Store a key
+python client.py --node localhost:50051 put mykey myvalue
+
+# Retrieve a key
+python client.py --node localhost:50052 get mykey
+
+# Delete a key
+python client.py --node localhost:50053 delete mykey
+```
+
+## 🔧 Configuration
+
+### Replication Factor
+
+To change the replication factor, modify `src/node.py` line 18:
+
 ```python
-import hashlib
-
-# Chord ring size (m-bit identifier space)
-M = 160  # Using SHA-1 for 160-bit identifiers
-RING_SIZE = 2 ** M
-
-
-def hash_key(key: str) -> int:
-    """Hash a key to an integer in the Chord identifier space."""
-    sha1 = hashlib.sha1(key.encode('utf-8'))
-    return int(sha1.hexdigest(), 16) % RING_SIZE
-
-
-def in_range(value: int, start: int, end: int, inclusive_start: bool = False, 
-             inclusive_end: bool = False) -> bool:
-    """
-    Check if value is in range (start, end) on the Chord ring.
-    Handles wraparound.
-    """
-    if start == end:
-        return inclusive_start or inclusive_end
-    
-    if start < end:
-        if inclusive_start and inclusive_end:
-            return start <= value <= end
-        elif inclusive_start:
-            return start <= value < end
-        elif inclusive_end:
-            return start < value <= end
-        else:
-            return start < value < end
-    else:  # Wraparound case
-        if inclusive_start and inclusive_end:
-            return value >= start or value <= end
-        elif inclusive_start:
-            return value >= start or value < end
-        elif inclusive_end:
-            return value > start or value <= end
-        else:
-            return value > start or value < end
-
-
-def distance(start: int, end: int) -> int:
-    """Calculate distance from start to end on the Chord ring."""
-    if end >= start:
-        return end - start
-    else:
-        return RING_SIZE - start + end
+def __init__(self, address: str, replication_factor: int = 3):
+    # ...
+    self.replication_factor = replication_factor  # Change this value (1-N)
 ```
 
-4. Storage (src/storage.py)
+Higher replication factor = more fault tolerance but more storage overhead.
+
+### Ring Size
+
+The identifier space is defined in `src/utils.py`:
+
 ```python
-from typing import Dict, List, Tuple
-import threading
-
-
-class Storage:
-    """Thread-safe key-value storage for a Chord node."""
-    
-    def __init__(self):
-        self.data: Dict[str, str] = {}
-        self.lock = threading.RLock()
-    
-    def put(self, key: str, value: str) -> bool:
-        """Store a key-value pair."""
-        with self.lock:
-            self.data[key] = value
-            return True
-    
-    def get(self, key: str) -> tuple[bool, str]:
-        """Retrieve a value by key."""
-        with self.lock:
-            if key in self.data:
-                return True, self.data[key]
-            return False, ""
-    
-    def delete(self, key: str) -> bool:
-        """Delete a key-value pair."""
-        with self.lock:
-            if key in self.data:
-                del self.data[key]
-                return True
-            return False
-    
-    def get_keys_in_range(self, start_id: int, end_id: int) -> List[Tuple[str, str]]:
-        """Get all keys whose hash falls in range (start_id, end_id]."""
-        from .utils import hash_key, in_range
-        
-        with self.lock:
-            result = []
-            for key, value in self.data.items():
-                key_hash = hash_key(key)
-                if in_range(key_hash, start_id, end_id, 
-                           inclusive_start=False, inclusive_end=True):
-                    result.append((key, value))
-            return result
-    
-    def remove_keys(self, keys: List[str]) -> None:
-        """Remove multiple keys from storage."""
-        with self.lock:
-            for key in keys:
-                self.data.pop(key, None)
-    
-    def add_keys(self, keys: List[Tuple[str, str]]) -> None:
-        """Add multiple key-value pairs."""
-        with self.lock:
-            for key, value in keys:
-                self.data[key] = value
-    
-    def get_all_keys(self) -> List[Tuple[str, str]]:
-        """Get all key-value pairs."""
-        with self.lock:
-            return list(self.data.items())
-    
-    def size(self) -> int:
-        """Return number of stored keys."""
-        with self.lock:
-            return len(self.data)
+RING_BITS = 14  # 2^14 = 16,384 possible positions
+RING_SIZE = 2 ** RING_BITS
 ```
 
-5. Finger Table (src/finger_table.py)
+Larger ring = more positions for nodes, but visualization becomes harder.
+
+### Stabilization Interval
+
+Adjust how frequently nodes run stabilization (in `src/node.py`):
+
 ```python
-from typing import Optional, List
-from dataclasses import dataclass
-import threading
-
-
-@dataclass
-class NodeInfo:
-    """Information about a node in the Chord ring."""
-    id: int
-    address: str
-    
-    def __eq__(self, other):
-        if isinstance(other, NodeInfo):
-            return self.id == other.id
-        return False
-    
-    def __hash__(self):
-        return hash(self.id)
-
-
-class FingerTable:
-    """Finger table for Chord protocol."""
-    
-    def __init__(self, node_id: int, m: int = 160):
-        self.node_id = node_id
-        self.m = m  # Number of bits in identifier space
-        self.ring_size = 2 ** m
-        self.fingers: List[Optional[NodeInfo]] = [None] * m
-        self.lock = threading.RLock()
-    
-    def start(self, i: int) -> int:
-        """Calculate the start of the i-th finger interval."""
-        return (self.node_id + 2 ** i) % self.ring_size
-    
-    def update_finger(self, i: int, node: NodeInfo) -> None:
-        """Update the i-th finger entry."""
-        with self.lock:
-            if 0 <= i < self.m:
-                self.fingers[i] = node
-    
-    def get_finger(self, i: int) -> Optional[NodeInfo]:
-        """Get the i-th finger entry."""
-        with self.lock:
-            if 0 <= i < self.m:
-                return self.fingers[i]
-            return None
-    
-    def closest_preceding_node(self, id: int) -> Optional[NodeInfo]:
-        """Find the closest finger preceding id."""
-        from .utils import in_range
-        
-        with self.lock:
-            for i in range(self.m - 1, -1, -1):
-                if self.fingers[i] is not None:
-                    finger_id = self.fingers[i].id
-                    if in_range(finger_id, self.node_id, id, 
-                              inclusive_start=False, inclusive_end=False):
-                        return self.fingers[i]
-            return None
-    
-    def get_all_fingers(self) -> List[Optional[NodeInfo]]:
-        """Get all finger entries."""
-        with self.lock:
-            return self.fingers.copy()
+def start_stabilization(self, interval: float = 1.0):  # seconds
 ```
 
-6. gRPC Client (src/chord_client.py)
+Lower interval = faster convergence but more network traffic.
+
+### Storage Path
+
+Data files are stored in the `data/` directory by default. Change in `src/node.py`:
+
 ```python
-import grpc
-from typing import Optional, List, Tuple
-import sys
-import os
-
-# Add proto directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'proto'))
-
-import chord_pb2
-import chord_pb2_grpc
-from .finger_table import NodeInfo
-
-
-class ChordClient:
-    """Client for making gRPC calls to other Chord nodes."""
-    
-    @staticmethod
-    def create_channel(address: str, timeout: int = 5):
-        """Create a gRPC channel with timeout."""
-        return grpc.insecure_channel(
-            address,
-            options=[
-                ('grpc.max_send_message_length', 50 * 1024 * 1024),
-                ('grpc.max_receive_message_length', 50 * 1024 * 1024),
-            ]
-        )
-    
-    @staticmethod
-    def find_successor(address: str, id: int) -> Optional[NodeInfo]:
-        """Find the successor of given id."""
-        try:
-            with ChordClient.create_channel(address) as channel:
-                stub = chord_pb2_grpc.ChordServiceStub(channel)
-                request = chord_pb2.FindSuccessorRequest(id=str(id))
-                response = stub.FindSuccessor(request, timeout=5.0)
-                if response.node:
-                    return NodeInfo(int(response.node.id), response.node.address)
-        except Exception as e:
-            print(f"Error finding successor from {address}: {e}")
-        return None
-    
-    @staticmethod
-    def get_predecessor(address: str) -> Optional[NodeInfo]:
-        """Get the predecessor of a node."""
-        try:
-            with ChordClient.create_channel(address) as channel:
-                stub = chord_pb2_grpc.ChordServiceStub(channel)
-                request = chord_pb2.GetPredecessorRequest()
-                response = stub.GetPredecessor(request, timeout=5.0)
-                if response.has_predecessor and response.node:
-                    return NodeInfo(int(response.node.id), response.node.address)
-        except Exception as e:
-            print(f"Error getting predecessor from {address}: {e}")
-        return None
-    
-    @staticmethod
-    def notify(address: str, node: NodeInfo) -> bool:
-        """Notify a node about another node."""
-        try:
-            with ChordClient.create_channel(address) as channel:
-                stub = chord_pb2_grpc.ChordServiceStub(channel)
-                node_info = chord_pb2.NodeInfo(id=str(node.id), address=node.address)
-                request = chord_pb2.NotifyRequest(node=node_info)
-                response = stub.Notify(request, timeout=5.0)
-                return response.success
-        except Exception as e:
-            print(f"Error notifying {address}: {e}")
-        return False
-    
-    @staticmethod
-    def closest_preceding_finger(address: str, id: int) -> Optional[NodeInfo]:
-        """Get closest preceding finger from a node."""
-        try:
-            with ChordClient.create_channel(address) as channel:
-                stub = chord_pb2_grpc.ChordServiceStub(channel)
-                request = chord_pb2.ClosestPrecedingFingerRequest(id=str(id))
-                response = stub.ClosestPrecedingFinger(request, timeout=5.0)
-                if response.node:
-                    return NodeInfo(int(response.node.id), response.node.address)
-        except Exception as e:
-            print(f"Error getting closest preceding finger from {address}: {e}")
-        return None
-    
-    @staticmethod
-    def ping(address: str) -> bool:
-        """Ping a node to check if it's alive."""
-        try:
-            with ChordClient.create_channel(address) as channel:
-                stub = chord_pb2_grpc.ChordServiceStub(channel)
-                request = chord_pb2.PingRequest()
-                response = stub.Ping(request, timeout=2.0)
-                return response.alive
-        except:
-            return False
-    
-    @staticmethod
-    def put(address: str, key: str, value: str) -> bool:
-        """Store a key-value pair on a node."""
-        try:
-            with ChordClient.create_channel(address) as channel:
-                stub = chord_pb2_grpc.ChordServiceStub(channel)
-                request = chord_pb2.PutRequest(key=key, value=value)
-                response = stub.Put(request, timeout=5.0)
-                return response.success
-        except Exception as e:
-            print(f"Error putting key to {address}: {e}")
-        return False
-    
-    @staticmethod
-    def get(address: str, key: str) -> Tuple[bool, str]:
-        """Get a value by key from a node."""
-        try:
-            with ChordClient.create_channel(address) as channel:
-                stub = chord_pb2_grpc.ChordServiceStub(channel)
-                request = chord_pb2.GetRequest(key=key)
-                response = stub.Get(request, timeout=5.0)
-                return response.found, response.value
-        except Exception as e:
-            print(f"Error getting key from {address}: {e}")
-        return False, ""
-    
-    @staticmethod
-    def delete(address: str, key: str) -> bool:
-        """Delete a key from a node."""
-        try:
-            with ChordClient.create_channel(address) as channel:
-                stub = chord_pb2_grpc.ChordServiceStub(channel)
-                request = chord_pb2.DeleteRequest(key=key)
-                response = stub.Delete(request, timeout=5.0)
-                return response.success
-        except Exception as e:
-            print(f"Error deleting key from {address}: {e}")
-        return False
-    
-    @staticmethod
-    def transfer_keys(address: str, keys: List[Tuple[str, str]]) -> bool:
-        """Transfer keys to another node."""
-        try:
-            with ChordClient.create_channel(address) as channel:
-                stub = chord_pb2_grpc.ChordServiceStub(channel)
-                key_values = [chord_pb2.KeyValue(key=k, value=v) for k, v in keys]
-                request = chord_pb2.TransferKeysRequest(keys=key_values)
-                response = stub.TransferKeys(request, timeout=10.0)
-                return response.success
-        except Exception as e:
-            print(f"Error transferring keys to {address}: {e}")
-        return False
+persist_path = "data"  # Change to your preferred path
 ```
+
+## 🧪 Testing Fault Tolerance
+
+### Basic Replication Test:
+
+1. **Start 5 nodes** using the web interface (click "Add & Join" 4 times)
+2. **Store a key** (e.g., key="test", value="hello")
+3. **Observe** in the UI that 3 nodes have this key (look for 🔑 and 📋 icons)
+4. **Remove the primary node** (the one with 🔑)
+5. **Try to GET the key** from another node - should still work!
+
+### Consistency Test:
+
+1. **Start 4 nodes**
+2. **Store multiple keys** (e.g., key1, key2, key3)
+3. **Delete one key** from any node
+4. **Verify** the key is gone from ALL replicas (check all nodes in the UI)
+
+### Load Distribution Test:
+
+1. **Start 6 nodes**
+2. **Add 20 different keys** with various names
+3. **Observe** how keys are distributed across nodes
+4. **Note** that each key appears on exactly 3 nodes (replication_factor)
+
+## 📊 How Replication Works
+
+### PUT Operation (Write):
+1. Hash the key to find its position in the ring
+2. Find the successor node (responsible node)
+3. Store on **primary node** (key's successor)
+4. Store on **next 2 successors** (replication_factor - 1)
+5. Return success if stored on **quorum** (≥ 2 nodes for RF=3)
+
+### GET Operation (Read):
+1. Find responsible nodes for the key
+2. Try to retrieve from **primary** first
+3. If primary fails, try **replicas** in order
+4. Return value from first successful read
+
+### DELETE Operation:
+1. Find all nodes storing the key
+2. Delete from **ALL replicas synchronously**
+3. Ensures no stale data remains
+4. Return success if key was found and deleted
+
+## 🎯 Performance Characteristics
+
+- **Lookup Time**: O(log N) hops where N = number of nodes
+- **Storage Overhead**: Each key stored R times (R = replication_factor)
+- **Write Consistency**: Quorum-based (majority of replicas must succeed)
+- **Read Availability**: High (can read from any replica)
+- **Fault Tolerance**: Can survive R-1 node failures per key
+- **Network Overhead**: O(R) messages per write operation
+
+## 🐛 Troubleshooting
+
+### "Failed to store key" Error
+**Possible causes:**
+- Not enough nodes in the ring (need at least `replication_factor` nodes)
+- Nodes haven't stabilized yet (wait 2-3 seconds after adding nodes)
+- Data directory permission issues
+
+**Solutions:**
+- Ensure at least 3 nodes are running
+- Wait a few seconds between operations
+- Check terminal logs for specific errors
+- Verify `data/` directory exists and is writable
+
+### Keys Not Showing in UI
+**Possible causes:**
+- WebSocket connection issues
+- Browser cache problems
+- Stabilization in progress
+
+**Solutions:**
+- Check browser console for errors (F12)
+- Refresh the page (Ctrl+R or Cmd+R)
+- Wait 2-3 seconds after adding nodes
+- Check if WebSocket shows "Connected to server" in activity log
+
+### "Connection refused" Errors
+**Possible causes:**
+- Node not started or crashed
+- Port already in use
+- Firewall blocking connections
+
+**Solutions:**
+- Verify nodes are running: check terminal output
+- Try different ports
+- Check firewall settings
+- Ensure no other process is using ports 50051+
+
+### Nodes Disappear or Crash
+**Possible causes:**
+- Rapid succession of operations
+- Insufficient stabilization time
+- Bug in finger table updates
+
+**Solutions:**
+- Wait 1-2 seconds between adding nodes
+- Don't remove all nodes at once
+- Check logs for exceptions
+- Restart the server: `python server.py`
+
+### Storage Files Corrupted
+**Solutions:**
+```bash
+# Stop all nodes
+# Remove data directory
+rm -rf data/
+mkdir data
+
+# Restart server
+python server.py
+```
+
+## 📚 Chord Protocol Resources
+
+- [Original Chord Paper](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf) - Stoica et al., 2001
+- [Chord Protocol Overview](https://en.wikipedia.org/wiki/Chord_(peer-to-peer))
+- [Consistent Hashing](https://www.toptal.com/big-data/consistent-hashing)
+
+## 🔬 Technical Details
+
+### Hash Function
+Uses SHA-1 hash truncated to fit the ring size (default: 14 bits = 16,384 positions)
+
+### Finger Table
+Each node maintains m entries where entry i points to the first node ≥ (n + 2^i) mod 2^m
+
+### Stabilization Protocol
+Runs every 1 second to:
+1. Verify and update successor
+2. Notify potential predecessors  
+3. Fix one finger table entry (round-robin)
+4. Check if predecessor is alive
+
+### Replication Strategy
+Chain replication: primary stores first, then forwards to R-1 successors in sequence.
+
+## 🤝 Contributing
+
+Contributions are welcome! Areas for improvement:
+- Implement successor list for better fault tolerance
+- Add authentication and encryption
+- Improve network partition handling
+- Add load balancing
+- Implement virtual nodes for better distribution
+- Add metrics and monitoring
+
+## 📝 License
+
+[Specify your license here - MIT, Apache 2.0, etc.]
+
+## 👥 Authors
+
+[Your name/team]
+
+## 🙏 Acknowledgments
+
+Based on the Chord protocol by Stoica, Morris, Karger, Kaashoek, and Balakrishnan (MIT, 2001).
+
+---
+
+**⚠️ Note**: This is an educational implementation. For production use, consider additional features like authentication, encryption, more sophisticated failure detection, network partition handling, and proper security measures.
