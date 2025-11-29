@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 
 class Storage:
@@ -69,6 +69,11 @@ class Storage:
             self.logger.info(f"Key '{key}' not found for deletion")
             return False
     
+    def get_all_keys(self) -> List[str]:
+        """
+        Get all keys stored in the storage.
+        """
+        return self.data.copy()
     
     def __len__(self):
         """Return the number of key-value pairs stored."""

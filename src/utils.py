@@ -2,7 +2,7 @@ import hashlib
 from dataclasses import dataclass
 
 # Ring size 
-RING_BITS = 160
+RING_BITS = 8
 RING_SIZE = 2 ** RING_BITS # m-bit identifier space
 
 
