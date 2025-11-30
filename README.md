@@ -1,4 +1,4 @@
-# Chord Distributed Hash Table (DHT) with Replication
+# Chord Distributed Hash Table (DHT)
 
 A Python implementation of the Chord distributed hash table protocol with built-in replication for fault tolerance and a real-time web visualization interface.
 
@@ -396,29 +396,10 @@ Runs every 1 second to:
 
 ### Replication Strategy
 Chain replication: primary stores first, then forwards to R-1 successors in sequence.
-
-## 🤝 Contributing
-
-Contributions are welcome! Areas for improvement:
-- Implement successor list for better fault tolerance
-- Add authentication and encryption
-- Improve network partition handling
-- Add load balancing
-- Implement virtual nodes for better distribution
-- Add metrics and monitoring
-
-## 📝 License
-
-[Specify your license here - MIT, Apache 2.0, etc.]
+ 
 
 ## 👥 Authors
 
-[Your name/team]
-
-## 🙏 Acknowledgments
-
-Based on the Chord protocol by Stoica, Morris, Karger, Kaashoek, and Balakrishnan (MIT, 2001).
-
----
-
-**⚠️ Note**: This is an educational implementation. For production use, consider additional features like authentication, encryption, more sophisticated failure detection, network partition handling, and proper security measures.
+- Nikhil Chacko
+- Richa Verma 
+ 
