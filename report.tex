@@ -1,8 +1,8 @@
-\documentclass[12pt,a4paper]{article}
+\documentclass[12pt]{article}
 
 % Packages
 \usepackage[utf8]{inputenc}
-\usepackage[margin=1in]{geometry}
+\usepackage[margin=0.8in]{geometry}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{graphicx}
@@ -15,11 +15,11 @@
 \usepackage{enumitem}
 \usepackage{fancyhdr}
 
-% Page setup
-\pagestyle{fancy}
-\fancyhf{}
-\rhead{\thepage}
-\lhead{Chord: Distributed Hash Table Implementation}
+% % Page setup
+% \pagestyle{fancy}
+% \fancyhf{}
+% \rhead{\thepage}
+% \lhead{Chord: Distributed Hash Table Implementation}
 
 % Hyperlink setup
 \hypersetup{
@@ -52,7 +52,7 @@
 
 % Title information
 \title{\textbf{Chord: A Distributed Hash Table Implementation}}
-\author{}
+\author{Nikhil Chacko, Richa Verma}
 \date{}
 
 \begin{document}
@@ -61,7 +61,8 @@
 \thispagestyle{empty}
 
 \begin{abstract}
-This paper presents a comprehensive implementation of the Chord protocol, a structured peer-to-peer distributed hash table (DHT) that provides efficient key lookup in decentralized systems. Our implementation leverages gRPC for inter-node communication and incorporates advanced features including configurable replication for fault tolerance, persistent storage, and real-time visualization. The system achieves $O(\log N)$ lookup complexity through finger table-based routing and maintains correctness through periodic stabilization. We demonstrate a fully functional distributed key-value store capable of handling dynamic node joins, departures, and fail-stop failures while maintaining data availability and consistency.
+This project presents a complete implementation of the Chord protocol, a structured peer-to-peer Distributed Hash Table (DHT) designed to provide efficient and decentralized key lookup. 
+Our implementation leverages gRPC for inter-node communication and incorporates advanced features including configurable replication for fault tolerance, persistent storage, and real-time visualization. The system achieves $O(\log N)$ lookup complexity through finger table-based routing and maintains correctness through periodic stabilization. We demonstrate a fully functional distributed key-value store capable of handling dynamic node joins, departures, and fail-stop failures while maintaining data availability and consistency.
 \end{abstract}
 
 \section{Introduction}
