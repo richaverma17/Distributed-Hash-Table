@@ -92,7 +92,7 @@ Distributed-Hash-Table/
 ### 1. Clone the Repository
 
 ```bash
-git clone <your-repo-url>
+git clone git@github.com:richaverma17/Distributed-Hash-Table.git
 cd Distributed-Hash-Table
 ```
 
@@ -128,7 +128,7 @@ The project requires:
 If you modify `proto/chord.proto`, regenerate the Python files:
 
 ```bash
-python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/chord.proto
+make proto
 ```
 
 ### 5. Create Data Directory
@@ -186,7 +186,7 @@ Then open your browser to: **http://localhost:8000**
 - **Active Nodes Panel**: Lists all nodes with their keys, successors, and predecessors
 - **Activity Log**: Real-time log of all operations
 
-### Option 2: Command Line (Advanced)
+### Option 2: Command Line
 
 Run individual nodes in separate terminals:
 
@@ -223,7 +223,7 @@ To change the replication factor, modify `src/node.py` line 18:
 ```python
 def __init__(self, address: str, replication_factor: int = 3):
     # ...
-    self.replication_factor = replication_factor  # Change this value (1-N)
+    self.replication_factor = replication_factor
 ```
 
 Higher replication factor = more fault tolerance but more storage overhead.
@@ -376,13 +376,11 @@ python server.py
 ## 📚 Chord Protocol Resources
 
 - [Original Chord Paper](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf) - Stoica et al., 2001
-- [Chord Protocol Overview](https://en.wikipedia.org/wiki/Chord_(peer-to-peer))
-- [Consistent Hashing](https://www.toptal.com/big-data/consistent-hashing)
 
 ## 🔬 Technical Details
 
 ### Hash Function
-Uses SHA-1 hash truncated to fit the ring size (default: 14 bits = 16,384 positions)
+Uses SHA-1 hash truncated to fit the ring size (default: 8 bits = 256 positions)
 
 ### Finger Table
 Each node maintains m entries where entry i points to the first node ≥ (n + 2^i) mod 2^m
@@ -400,6 +398,6 @@ Chain replication: primary stores first, then forwards to R-1 successors in sequ
 
 ## 👥 Authors
 
-- Nikhil Chacko
+- Nikhil Saji Chacko
 - Richa Verma 
  
