@@ -2,11 +2,11 @@
 
 A Python implementation of the Chord distributed hash table protocol with built-in replication for fault tolerance and a real-time web visualization interface.
 
-## 🎯 What is Chord DHT?
+## What is Chord DHT?
 
 Chord is a distributed hash table protocol that provides efficient key lookup in a peer-to-peer network. It uses consistent hashing to distribute keys across nodes in a circular identifier space (ring). Each node is responsible for a portion of the key space and maintains routing information (finger table) to efficiently locate keys in O(log N) hops.
 
-## ✨ Features
+## Features
 
 - **Chord Protocol Implementation**: Full implementation of the Chord DHT protocol
   - Efficient key lookup using finger tables (O(log N) complexity)
@@ -35,7 +35,7 @@ Chord is a distributed hash table protocol that provides efficient key lookup in
   - JSON-based persistence for each node
   - Automatic recovery on node restart
 
-## 🏗️ Architecture
+## Architecture
 
 ### Project Structure
 
@@ -82,12 +82,12 @@ Distributed-Hash-Table/
    - Real-time updates via WebSocket
    - Provides REST API for node/key operations
 
-## 📋 Prerequisites
+## Prerequisites
 
 - Python 3.8 or higher
 - pip (Python package manager)
 
-## 🚀 Setup Instructions
+## Setup Instructions
 
 ### 1. Clone the Repository
 
@@ -139,7 +139,7 @@ The data directory is created automatically, but you can create it manually if n
 mkdir -p data
 ```
 
-## 🎮 Usage
+## Usage
 
 ### Option 1: Web Visualizer (Recommended)
 
@@ -173,18 +173,6 @@ Then open your browser to: **http://localhost:8000**
    - Enter a key
    - Click **"DELETE"** (removes from all replicas to maintain consistency)
 
-5. **Visualize**:
-   - See the Chord ring with all nodes positioned by their hash IDs
-   - Green dashed lines show replication relationships
-   - Keys shown with 🔑 (primary) or 📋 (replica) icons
-   - Green badge shows number of keys per node
-
-#### Understanding the UI:
-
-- **Stats Cards**: Show active nodes, ring size, unique keys, total replicas, and replication factor
-- **Chord Ring**: Visual representation of nodes on the identifier space
-- **Active Nodes Panel**: Lists all nodes with their keys, successors, and predecessors
-- **Activity Log**: Real-time log of all operations
 
 ### Option 2: Command Line
 
@@ -214,7 +202,7 @@ python client.py --node localhost:50052 get mykey
 python client.py --node localhost:50053 delete mykey
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Replication Factor
 
@@ -257,7 +245,7 @@ Data files are stored in the `data/` directory by default. Change in `src/node.p
 persist_path = "data"  # Change to your preferred path
 ```
 
-## 🧪 Testing Fault Tolerance
+## Testing Fault Tolerance
 
 ### Basic Replication Test:
 
@@ -281,7 +269,7 @@ persist_path = "data"  # Change to your preferred path
 3. **Observe** how keys are distributed across nodes
 4. **Note** that each key appears on exactly 3 nodes (replication_factor)
 
-## 📊 How Replication Works
+## How Replication Works
 
 ### PUT Operation (Write):
 1. Hash the key to find its position in the ring
@@ -302,7 +290,7 @@ persist_path = "data"  # Change to your preferred path
 3. Ensures no stale data remains
 4. Return success if key was found and deleted
 
-## 🎯 Performance Characteristics
+## Performance Characteristics
 
 - **Lookup Time**: O(log N) hops where N = number of nodes
 - **Storage Overhead**: Each key stored R times (R = replication_factor)
@@ -311,7 +299,7 @@ persist_path = "data"  # Change to your preferred path
 - **Fault Tolerance**: Can survive R-1 node failures per key
 - **Network Overhead**: O(R) messages per write operation
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### "Failed to store key" Error
 **Possible causes:**
@@ -373,11 +361,11 @@ mkdir data
 python server.py
 ```
 
-## 📚 Chord Protocol Resources
+## Chord Protocol Resources
 
 - [Original Chord Paper](https://pdos.csail.mit.edu/papers/chord:sigcomm01/chord_sigcomm.pdf) - Stoica et al., 2001
 
-## 🔬 Technical Details
+## Technical Details
 
 ### Hash Function
 Uses SHA-1 hash truncated to fit the ring size (default: 8 bits = 256 positions)
@@ -396,8 +384,7 @@ Runs every 1 second to:
 Chain replication: primary stores first, then forwards to R-1 successors in sequence.
  
 
-## 👥 Authors
-
+## Authors
 - Nikhil Saji Chacko
 - Richa Verma 
  
