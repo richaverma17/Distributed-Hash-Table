@@ -52,7 +52,7 @@
 
 % Title information
 \title{\textbf{Chord: A Distributed Hash Table Implementation}}
-\author{Nikhil Chacko, Richa Verma}
+\author{Nikhil Saji Chacko, Richa Verma}
 \date{}
 
 \begin{document}
@@ -553,24 +553,7 @@ We verified consistent hashing properties by:
 \begin{itemize}[itemsep=0pt]
     \item Vector clocks for conflict detection
     \item Read repair mechanism
-    \item Merkle trees for replica synchronization
     \item Configurable consistency levels
-\end{itemize}
-
-\subsection{Security Enhancements}
-\begin{itemize}[itemsep=0pt]
-    \item TLS encryption for gRPC channels
-    \item Certificate-based node authentication
-    \item Access control for operations
-    \item Rate limiting to prevent DoS attacks
-\end{itemize}
-
-\subsection{Monitoring and Metrics}
-\begin{itemize}[itemsep=0pt]
-    \item Prometheus metrics export
-    \item Grafana dashboards
-    \item Performance profiling
-    \item Alerting on failures and imbalance
 \end{itemize}
 
 \section{Conclusion}
@@ -593,10 +576,6 @@ The implementation validates the elegance and robustness of the Chord algorithm 
     \item Benefits of layered architecture
 \end{itemize}
 
-Beyond academic learning, this project provides a foundation for building more sophisticated distributed systems. The modular design enables straightforward extensions such as stronger consistency models, geographic replication, and security mechanisms.
-
-\section*{Acknowledgments}
-This implementation is based on the Chord protocol designed by Ion Stoica, Robert Morris, David Karger, M. Frans Kaashoek, and Hari Balakrishnan at MIT (2001).
 
 \begin{thebibliography}{9}
 
@@ -605,25 +584,10 @@ Stoica, I., Morris, R., Karger, D., Kaashoek, M. F., \& Balakrishnan, H. (2001).
 \textit{Chord: A scalable peer-to-peer lookup service for internet applications}. 
 ACM SIGCOMM Computer Communication Review, 31(4), 149-160.
 
-\bibitem{dynamo}
-DeCandia, G., et al. (2007). 
-\textit{Dynamo: Amazon's highly available key-value store}. 
-ACM SIGOPS Operating Systems Review, 41(6), 205-220.
-
-\bibitem{cassandra}
-Lakshman, A., \& Malik, P. (2010). 
-\textit{Cassandra: a decentralized structured storage system}. 
-ACM SIGOPS Operating Systems Review, 44(2), 35-40.
-
 \bibitem{consistent-hashing}
 Karger, D., et al. (1997). 
 \textit{Consistent hashing and random trees}. 
 ACM Symposium on Theory of Computing, 654-663.
-
-\bibitem{cap}
-Brewer, E. A. (2000). 
-\textit{Towards robust distributed systems}. 
-PODC, 7.
 
 \end{thebibliography}
 
