@@ -27,7 +27,7 @@ class ChordClient(object):
 
     def get(self, key: str) -> tuple[bool, str]:
         try:
-            request = chord_pb2.GetRequest(key=key)
+            request = chord_pb2.GetRequest(key=key, route=True)
             response = self.stub.Get(request, timeout=10.0)
             return response.found, response.value
         except Exception as e:

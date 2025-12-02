@@ -38,6 +38,7 @@ message FindSuccessorRequest {
 
 message GetRequest {
     string key = 1;
+    bool route = 2;
 }
 
 message GetResponse {

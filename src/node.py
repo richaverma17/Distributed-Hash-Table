@@ -121,7 +121,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                 else:
                     # ask the node for its successor
                     stub = self._create_stub(current.address)
-                    response = stub.FindSuccessor(chord_pb2.FindSuccessorRequest(id=str(key_hash)))
+                    response = stub.GetSuccessor(chord_pb2.Empty())
                     current = self._proto_to_node_info(response)
 
                 # Avoid duplicates (in case ring is smaller than replication factor)
@@ -265,6 +265,20 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         Periodically verify n's immediate successor and tell the successor about n.
         This is the core of the stabilization protocol.
         """
+        # First check the successor is alive
+        if self.successor.id != self.id:
+            try:
+                stub = self._create_stub(self.successor.address)
+                stub.Ping(chord_pb2.Empty(), timeout=2.0)
+            except Exception as e:
+                self.logger.warning(f"Successor {self.successor.id % 10000} failed: {e}")
+                # Try to find next alive successor from finger table
+                self._find_next_alive_successor()
+                if self.successor.id == self.id:
+                    # No other nodes available
+                    return
+
+
         try:
             # Get our successor's predecessor
             stub = self._create_stub(self.successor.address)
@@ -289,6 +303,34 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         except Exception as e:
             self.logger.error(f"Error in stabilize: {e}")
             # Successor might have failed, handle this in check_predecessor
+
+
+    def _find_next_alive_successor(self):
+        """
+        Find the next alive successor from the finger table.
+        """
+        for i in range(len(self.finger_table)):
+            finger_entry = self.finger_table[i]
+            if finger_entry and finger_entry.successor:
+                candidate = finger_entry.successor
+
+                # Skip self and current failed successor
+                if candidate.id == self.id or candidate.id == self.successor.id:
+                    continue
+
+                # Try to ping this candidate
+                try:
+                    stub = self._create_stub(candidate.address)
+                    stub.Ping(chord_pb2.Empty(), timeout=2.0)
+                    self.successor = candidate
+                    self.finger_table[0] = FingerEntry(
+                        start=self.finger_table.start(0),
+                        successor=self.successor
+                    )
+                    return
+                except Exception as e:
+                    self.logger.warning(f"Candidate {candidate.id % 10000} failed: {e}")
+                    continue
 
     def notify(self, node: NodeInfo):
         """
@@ -423,7 +465,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                 else:
                     # Forward to replica node
                     stub = self._create_stub(node.address)
-                    response = stub.Get(chord_pb2.GetRequest(key=key))
+                    response = stub.Get(chord_pb2.GetRequest(key=key, route=False))
                     if response.found:
                         self.logger.info(f"Found key '{key}' on replica node {node.id % 10000}")
                         return response.value
@@ -554,7 +596,13 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         RPC handler for Get operation.
         """
         key = request.key
-        value = self.get(key)
+
+        if request.route:
+            # Client request - route to the correct node
+            value = self.get(key)
+        else:
+            # Node request - read locally
+            value = self.storage.get(key)
         
         if value is not None:
             return chord_pb2.GetResponse(found=True, value=value)
