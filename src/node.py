@@ -8,6 +8,7 @@ from proto import chord_pb2, chord_pb2_grpc
 from .utils import hash_key, NodeInfo
 from .finger_table import FingerTable, FingerEntry
 from .storage import Storage
+from .utils import RING_BITS
 
 
 class Node(chord_pb2_grpc.ChordServiceServicer):
@@ -33,7 +34,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         # Initialize storage
         self.storage = Storage(self.id)
         # Stabilization state
-        self.next_finger = 0 # for fix_fingers
+        self.next_finger = 0  # for fix_fingers
         self._stabilization_thread = None
         self._stabilization_running = False
 
@@ -64,7 +65,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         This is called after joining a network.
         """
         self.logger.info("Initializing finger table...")
-        
+
         for i in range(len(self.finger_table)):
             start = self.finger_table.start(i)
             # Find successor for this finger
@@ -72,16 +73,15 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
             self.finger_table[i] = FingerEntry(start=start, successor=finger_succ)
         self.logger.info("Finger table initialized")
 
-    def _in_range(self, key: int, start: int, end: int, 
-                  inclusive_start=False, inclusive_end=False) -> bool:
+    def _in_range(self, key: int, start: int, end: int, inclusive_start=False, inclusive_end=False) -> bool:
         """
         Check if key is in range (start, end) on the circular identifier space.
-        
+
         By default: (start, end) - exclusive on both ends
         """
         if start == end:
             return inclusive_start or inclusive_end
-        
+
         if start < end:
             # Normal case: no wraparound
             if inclusive_start and inclusive_end:
@@ -131,7 +131,17 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                     break
             except Exception as e:
                 self.logger.error(f"Error getting successor from {current.address}: {e}")
-                break
+                # Instead of breaking, try to find the successor of this dead node
+                try:
+                    # Use find_successor to skip the dead node
+                    next_id = (current.id + 1) % (2**RING_BITS)  # You'll need to import RING_BITS
+                    current = self.find_successor(next_id)
+                    if current.id not in [r.id for r in replicas]:
+                        replicas.append(current)
+                    else:
+                        break
+                except:
+                    break
 
         return replicas
 
@@ -139,7 +149,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         chord_pb2_grpc.add_ChordServiceServicer_to_server(self, server)
         # Start the server on the given address
-        server.add_insecure_port(f'{self.address}')
+        server.add_insecure_port(f"{self.address}")
         # Set the running flag to True
         self.running = True
         # Start the server
@@ -160,27 +170,27 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
     def join(self, existing_node_address: Optional[str] = None):
         """
         Join a Chord ring.
-        
+
         If existing_node_address is None, create a new ring.
         Otherwise, join the existing ring through that node.
         """
         if existing_node_address:
             self.logger.info(f"Joining existing Chord network via {existing_node_address}")
-            
+
             try:
                 stub = self._create_stub(existing_node_address)
                 # Find our successor
                 response = stub.FindSuccessor(chord_pb2.FindSuccessorRequest(id=str(self.id)))
                 self.successor = self._proto_to_node_info(response)
-                
+
                 if not self.successor:
                     raise Exception("Failed to get successor information")
-                
+
                 self.logger.info(f"Found successor: Node {self.successor.id % 10000} at {self.successor.address}")
-                
+
                 # Predecessor will be set by stabilization
                 self.predecessor = None
-                
+
                 # Initialize finger table
                 self._init_finger_table()
 
@@ -188,13 +198,15 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                 try:
                     stub = self._create_stub(self.successor.address)
                     stub.Notify(self._node_info_to_proto(NodeInfo(self.id, self.address)))
-                    self.logger.info(f"Notified successor: Node {self.successor.id % 10000} at {self.successor.address}")
+                    self.logger.info(
+                        f"Notified successor: Node {self.successor.id % 10000} at {self.successor.address}"
+                    )
                 except Exception as e:
                     self.logger.error(f"Error notifying successor: {e}")
-                
+
                 self.logger.info("Successfully joined the Chord network")
                 return True
-                
+
             except Exception as e:
                 self.logger.error(f"Failed to join Chord network: {e}")
                 return False
@@ -203,18 +215,15 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
             self.logger.info("Creating new Chord network")
             self.successor = NodeInfo(id=self.id, address=self.address)
             self.predecessor = None
-            
+
             # Initialize all fingers to point to self
             for i in range(len(self.finger_table)):
                 start = self.finger_table.start(i)
-                self.finger_table[i] = FingerEntry(
-                    start=start,
-                    successor=NodeInfo(id=self.id, address=self.address)
-                )
-            
+                self.finger_table[i] = FingerEntry(start=start, successor=NodeInfo(id=self.id, address=self.address))
+
             self.logger.info("New Chord network created")
             return True
-    
+
     def closest_preceding_finger(self, id: int) -> NodeInfo:
         """
         Find the closest finger preceding id in our finger table.
@@ -228,14 +237,14 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                 # Check if finger is in range (self.id, id)
                 if self._in_range(finger_node.id, self.id, id):
                     return finger_node
-        
+
         # If no finger is closer, return self
         return NodeInfo(self.id, self.address)
 
     def find_successor(self, id: int) -> NodeInfo:
         """
         Find the successor node for a given ID.
-        
+
         Core Chord lookup algorithm:
         - If id is in (n, successor], return successor
         - Otherwise, forward to closest preceding node
@@ -243,10 +252,10 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         # If id is in (n, successor], return successor
         if self._in_range(id, self.id, self.successor.id, inclusive_start=False, inclusive_end=True):
             return self.successor
-        
+
         # Otherwise, forward to closest preceding node
         closest_node = self.closest_preceding_finger(id)
-        
+
         if closest_node.id == self.id:
             # No closer node found, return successor
             return self.successor
@@ -278,32 +287,27 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                     # No other nodes available
                     return
 
-
         try:
             # Get our successor's predecessor
             stub = self._create_stub(self.successor.address)
             response = stub.GetPredecessor(chord_pb2.Empty())
             x = self._proto_to_node_info(response)
-            
+
             # If x exists and is between us and our successor, it should be our new successor
             if x and x.id != self.id:
-                if (self.successor.id == self.id or self._in_range(x.id, self.id, self.successor.id)):
+                if self.successor.id == self.id or self._in_range(x.id, self.id, self.successor.id):
                     self.logger.info(f"Updating successor from {self.successor.id % 10000} to {x.id % 10000}")
                     self.successor = x
                     # Also update first finger
-                    self.finger_table[0] = FingerEntry(
-                        start=self.finger_table.start(0),
-                        successor=self.successor
-                    )
-            
+                    self.finger_table[0] = FingerEntry(start=self.finger_table.start(0), successor=self.successor)
+
             # Notify successor that we might be its predecessor
             stub = self._create_stub(self.successor.address)
             stub.Notify(self._node_info_to_proto(NodeInfo(self.id, self.address)))
-            
+
         except Exception as e:
             self.logger.error(f"Error in stabilize: {e}")
             # Successor might have failed, handle this in check_predecessor
-
 
     def _find_next_alive_successor(self):
         """
@@ -323,10 +327,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                     stub = self._create_stub(candidate.address)
                     stub.Ping(chord_pb2.Empty(), timeout=2.0)
                     self.successor = candidate
-                    self.finger_table[0] = FingerEntry(
-                        start=self.finger_table.start(0),
-                        successor=self.successor
-                    )
+                    self.finger_table[0] = FingerEntry(start=self.finger_table.start(0), successor=self.successor)
                     return
                 except Exception as e:
                     self.logger.warning(f"Candidate {candidate.id % 10000} failed: {e}")
@@ -335,7 +336,7 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
     def notify(self, node: NodeInfo):
         """
         Node n' thinks it might be our predecessor.
-        
+
         Args:
             node: The node that might be our predecessor
         """
@@ -345,9 +346,11 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
 
         # If we don't have a predecessor, or if node is between our predecessor and us,
         # then node becomes our new predecessor
-        if (self.predecessor is None or 
-            self.predecessor.id == self.id or
-            self._in_range(node.id, self.predecessor.id, self.id)):
+        if (
+            self.predecessor is None
+            or self.predecessor.id == self.id
+            or self._in_range(node.id, self.predecessor.id, self.id)
+        ):
             self.logger.info(f"Updating predecessor to Node {node.id % 10000}")
             self.predecessor = node
 
@@ -360,17 +363,14 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
             # Refresh next_finger
             start = self.finger_table.start(self.next_finger)
             successor = self.find_successor(start)
-            
+
             if successor:
-                self.finger_table[self.next_finger] = FingerEntry(
-                    start=start,
-                    successor=successor
-                )
+                self.finger_table[self.next_finger] = FingerEntry(start=start, successor=successor)
                 self.logger.debug(f"Fixed finger[{self.next_finger}] to Node {successor.id % 10000}")
-            
+
             # Move to next finger (round-robin)
             self.next_finger = (self.next_finger + 1) % len(self.finger_table)
-            
+
         except Exception as e:
             self.logger.error(f"Error in fix_fingers: {e}")
 
@@ -388,22 +388,22 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                 self.predecessor = None
 
     # ======================== Key-Value Operations ==========================
-    
+
     def put(self, key: str, value: str) -> bool:
         """
         Store a key-value pair in the DHT.
         The key is hashed and stored at the appropriate node (successor of hash).
-        
+
         Args:
             key: The key to store
             value: The value to store
-            
+
         Returns:
             True if successful, False otherwise
         """
         key_hash = hash_key(key)
         self.logger.info(f"PUT request for key '{key}' (hash: {key_hash % 10000})")
-        
+
         # Get list of nodes that should store replicas for this key
         replica_nodes = self._get_replica_nodes(key_hash)
 
@@ -434,20 +434,18 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         self.logger.info(f"PUT '{key}': stored on {success_count}/{min_required} replicas")
         return success
 
-    
     def get(self, key: str) -> Optional[str]:
         """
         Retrieve a value from the DHT.
-        
+
         Args:
             key: The key to retrieve
-            
+
         Returns:
             The value if found, None otherwise
         """
         key_hash = hash_key(key)
         self.logger.info(f"GET request for key '{key}' (hash: {key_hash % 10000})")
-        
 
         # Get list of nodes that should store replicas for this key
 
@@ -475,20 +473,18 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
 
         return None
 
-    
     def delete(self, key: str) -> bool:
         """
         Delete a key-value pair from the DHT.
-        
+
         Args:
             key: The key to delete
-            
+
         Returns:
             True if key was found and deleted, False otherwise
         """
         key_hash = hash_key(key)
         self.logger.info(f"DELETE request for key '{key}' (hash: {key_hash % 10000})")
-        
 
         # Get list of nodes that should store replicas for this key
         replica_nodes = self._get_replica_nodes(key_hash)
@@ -519,17 +515,16 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         self.logger.info(f"Deleted key '{key}' on {delete_count} replicas")
         return found_on_any
 
-
     def start_stabilization(self, interval: float = 1.0):
         """
         Start periodic stabilization in a background thread.
-        
+
         Args:
             interval: Time between stabilization runs in seconds
         """
         import threading
         import time
-        
+
         def stabilization_loop():
             self.logger.info("Stabilization started")
             while self._stabilization_running:
@@ -539,10 +534,10 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
                     self.check_predecessor()
                 except Exception as e:
                     self.logger.error(f"Error in stabilization loop: {e}")
-                
+
                 time.sleep(interval)
             self.logger.info("Stabilization stopped")
-        
+
         self._stabilization_running = True
         self._stabilization_thread = threading.Thread(target=stabilization_loop, daemon=True)
         self._stabilization_thread.start()
@@ -553,7 +548,6 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
             self._stabilization_running = False
             if self._stabilization_thread:
                 self._stabilization_thread.join(timeout=5.0)
-
 
     # ================================ RPC Methods ================================
     def FindSuccessor(self, request, context):
@@ -584,7 +578,6 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
             self.notify(node)
         return chord_pb2.Empty()
 
-
     def Ping(self, request, context):
         """
         Check if the node is alive
@@ -603,12 +596,12 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         else:
             # Node request - read locally
             value = self.storage.get(key)
-        
+
         if value is not None:
             return chord_pb2.GetResponse(found=True, value=value)
         else:
             return chord_pb2.GetResponse(found=False, value="")
-    
+
     def Put(self, request, context):
         """
         RPC handler for Put operation.
@@ -622,10 +615,10 @@ class Node(chord_pb2_grpc.ChordServiceServicer):
         else:
             # Node request - store locally
             success = self.storage.put(key, value)
-        
+
         self.logger.info(f"PUT request for key '{key}' (hash: {hash_key(key) % 10000})")
         return chord_pb2.PutResponse(success=success)
-    
+
     def Delete(self, request, context):
         """
         RPC handler for Delete operation.
